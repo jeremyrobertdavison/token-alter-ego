@@ -1,5 +1,5 @@
 const MODULE_ID = "token-alter-ego";
-const MODULE_VERSION = "1.0.2";
+const MODULE_VERSION = "1.1.0";
 const FLAG_IDENTITIES = "identities";
 const FLAG_CURRENT = "currentIdentity";
 
@@ -28,6 +28,11 @@ function isConfigured(identities) {
     identities?.a?.name?.trim() &&
     identities?.b?.name?.trim()
   );
+}
+
+function normalizeDimension(value, fallback = 1) {
+  const number = Number(value);
+  return Number.isFinite(number) && number > 0 ? number : fallback;
 }
 
 function currentIdentityForToken(tokenDocument, identities) {
@@ -63,6 +68,8 @@ async function toggleIdentity(tokenDocument, actor) {
     await tokenDocument.update({
       name: next.name.trim(),
       "texture.src": next.img,
+      width: normalizeDimension(next.width),
+      height: normalizeDimension(next.height),
       [`flags.${MODULE_ID}.${FLAG_CURRENT}`]: nextKey
     });
   } catch (error) {
@@ -79,11 +86,15 @@ function buildIdentityEditor(actor, tokenDocument) {
   const values = {
     a: {
       name: saved?.a?.name ?? tokenName,
-      img: saved?.a?.img ?? tokenImg
+      img: saved?.a?.img ?? tokenImg,
+      width: normalizeDimension(saved?.a?.width),
+      height: normalizeDimension(saved?.a?.height)
     },
     b: {
       name: saved?.b?.name ?? "",
-      img: saved?.b?.img ?? ""
+      img: saved?.b?.img ?? "",
+      width: normalizeDimension(saved?.b?.width),
+      height: normalizeDimension(saved?.b?.height)
     }
   };
 
@@ -91,7 +102,7 @@ function buildIdentityEditor(actor, tokenDocument) {
   wrapper.className = "token-alter-ego-editor";
   wrapper.innerHTML = `
     <p class="notes">
-      Configure the two names and token images used by this Actor. Toggling changes only the placed token's displayed name and artwork.
+      Configure the two identities used by this Actor. Toggling changes the placed token's displayed name, artwork, width, and height.
     </p>
     <div class="tae-identity-grid">
       <section class="tae-identity-card" data-identity="a">
@@ -108,6 +119,16 @@ function buildIdentityEditor(actor, tokenDocument) {
             <button type="button" data-action="browse" title="Browse Files">
               <i class="fa-solid fa-file-import"></i>
             </button>
+          </div>
+        </div>
+        <div class="tae-size-fields">
+          <div class="form-group">
+            <label>Width (grid spaces)</label>
+            <input type="number" data-field="width" min="0.25" step="0.25">
+          </div>
+          <div class="form-group">
+            <label>Height (grid spaces)</label>
+            <input type="number" data-field="height" min="0.25" step="0.25">
           </div>
         </div>
       </section>
@@ -127,10 +148,20 @@ function buildIdentityEditor(actor, tokenDocument) {
             </button>
           </div>
         </div>
+        <div class="tae-size-fields">
+          <div class="form-group">
+            <label>Width (grid spaces)</label>
+            <input type="number" data-field="width" min="0.25" step="0.25">
+          </div>
+          <div class="form-group">
+            <label>Height (grid spaces)</label>
+            <input type="number" data-field="height" min="0.25" step="0.25">
+          </div>
+        </div>
       </section>
     </div>
     <p class="notes tae-footnote">
-      The Actor itself is not renamed, and no statistics, effects, initiative, ownership, vision, or position are changed.
+      The Actor itself is not renamed. Statistics, hit points, effects, initiative, ownership, vision, and token position are not changed. Size changes expand or shrink from the token's current top-left grid position.
     </p>
   `;
 
@@ -138,12 +169,16 @@ function buildIdentityEditor(actor, tokenDocument) {
     const card = wrapper.querySelector(`[data-identity="${key}"]`);
     const nameInput = card.querySelector('[data-field="name"]');
     const imgInput = card.querySelector('[data-field="img"]');
+    const widthInput = card.querySelector('[data-field="width"]');
+    const heightInput = card.querySelector('[data-field="height"]');
     const preview = card.querySelector(".tae-preview");
 
     // DialogV2 v13 expects string content (or a bare attribute-free element).
     // We build with the DOM for safe value assignment, then serialize to HTML.
     nameInput.setAttribute("value", values[key].name);
     imgInput.setAttribute("value", values[key].img);
+    widthInput.setAttribute("value", String(values[key].width));
+    heightInput.setAttribute("value", String(values[key].height));
     preview.setAttribute("src", values[key].img || "icons/svg/mystery-man.svg");
   }
 
@@ -214,8 +249,18 @@ function readEditorValues(content) {
     ?.trim() ?? "";
 
   return {
-    a: { name: read("a", "name"), img: read("a", "img") },
-    b: { name: read("b", "name"), img: read("b", "img") }
+    a: {
+      name: read("a", "name"),
+      img: read("a", "img"),
+      width: normalizeDimension(read("a", "width")),
+      height: normalizeDimension(read("a", "height"))
+    },
+    b: {
+      name: read("b", "name"),
+      img: read("b", "img"),
+      width: normalizeDimension(read("b", "width")),
+      height: normalizeDimension(read("b", "height"))
+    }
   };
 }
 

@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.1.0
+- Added configurable token width and height for each identity.
+- Identity swaps now update displayed name, artwork, width, and height together.
+- Existing v1.0.x configurations safely default missing dimensions to 1 x 1.
+- Supports fractional positive grid sizes through the configuration fields.
+- Token position is preserved when size changes; resizing expands or shrinks from the current top-left position.
+
 ## 1.0.2
 - Fixed the Foundry V13 DialogV2 `config.content element must have no attributes` error.
 - Configuration content is now supplied to DialogV2 as an HTML string, matching the documented v13 usage.
