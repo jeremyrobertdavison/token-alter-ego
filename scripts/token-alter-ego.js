@@ -1,5 +1,5 @@
 const MODULE_ID = "token-alter-ego";
-const MODULE_VERSION = "1.0.1";
+const MODULE_VERSION = "1.0.2";
 const FLAG_IDENTITIES = "identities";
 const FLAG_CURRENT = "currentIdentity";
 
@@ -140,12 +140,14 @@ function buildIdentityEditor(actor, tokenDocument) {
     const imgInput = card.querySelector('[data-field="img"]');
     const preview = card.querySelector(".tae-preview");
 
-    nameInput.value = values[key].name;
-    imgInput.value = values[key].img;
-    preview.src = values[key].img || "icons/svg/mystery-man.svg";
+    // DialogV2 v13 expects string content (or a bare attribute-free element).
+    // We build with the DOM for safe value assignment, then serialize to HTML.
+    nameInput.setAttribute("value", values[key].name);
+    imgInput.setAttribute("value", values[key].img);
+    preview.setAttribute("src", values[key].img || "icons/svg/mystery-man.svg");
   }
 
-  return wrapper;
+  return wrapper.outerHTML;
 }
 
 function getDialogContentRoot(dialog) {
