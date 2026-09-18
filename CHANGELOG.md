@@ -1,11 +1,16 @@
 # Changelog
 
-## 1.0.0
+## 1.0.1
+- Fixed the Configure Alter Ego HUD action so the Foundry V13 DialogV2 configuration window opens reliably.
+- Moved dialog event wiring to DialogV2's render callback, matching Foundry V13 behavior.
+- Improved FilePicker handling.
+- Added visible error notifications and console diagnostics instead of silent failures.
 
+## 1.0.0
 - Initial release.
-- Added two identities per Actor.
-- Added GM identity configuration from the Token HUD.
-- Added one-click Token HUD identity switching.
-- Switches only token artwork and displayed token name.
-- Stores current identity independently on each placed token.
-- Allows token owners to toggle configured identities.
+- Two identities per Actor.
+- Each identity stores a token display name and token image.
+- One-click identity switching from the Token HUD.
+- GM-only identity configuration.
+- Player toggle support for owned tokens.
+- Per-token current identity state.

@@ -1,4 +1,5 @@
 const MODULE_ID = "token-alter-ego";
+const MODULE_VERSION = "1.0.1";
 const FLAG_IDENTITIES = "identities";
 const FLAG_CURRENT = "currentIdentity";
 
@@ -66,7 +67,7 @@ async function toggleIdentity(tokenDocument, actor) {
     });
   } catch (error) {
     console.error(`${MODULE_ID} | Failed to toggle identity`, error);
-    ui.notifications.error("Token Alter Ego: Could not change this token. Check the console for details.");
+    ui.notifications.error("Token Alter Ego: Could not change this token. Check the browser console (F12) for details.");
   }
 }
 
@@ -104,7 +105,7 @@ function buildIdentityEditor(actor, tokenDocument) {
           <label>Token artwork</label>
           <div class="form-fields tae-image-field">
             <input type="text" data-field="img" autocomplete="off">
-            <button type="button" class="file-picker" data-action="browse" title="Browse Files">
+            <button type="button" data-action="browse" title="Browse Files">
               <i class="fa-solid fa-file-import"></i>
             </button>
           </div>
@@ -121,7 +122,7 @@ function buildIdentityEditor(actor, tokenDocument) {
           <label>Token artwork</label>
           <div class="form-fields tae-image-field">
             <input type="text" data-field="img" autocomplete="off">
-            <button type="button" class="file-picker" data-action="browse" title="Browse Files">
+            <button type="button" data-action="browse" title="Browse Files">
               <i class="fa-solid fa-file-import"></i>
             </button>
           </div>
@@ -142,38 +143,71 @@ function buildIdentityEditor(actor, tokenDocument) {
     nameInput.value = values[key].name;
     imgInput.value = values[key].img;
     preview.src = values[key].img || "icons/svg/mystery-man.svg";
-
-    imgInput.addEventListener("change", () => {
-      preview.src = imgInput.value || "icons/svg/mystery-man.svg";
-    });
   }
 
   return wrapper;
 }
 
-async function browseForImage(input, preview) {
-  const FilePickerClass = foundry?.applications?.apps?.FilePicker ?? globalThis.FilePicker;
-  if (!FilePickerClass) {
-    ui.notifications.error("Token Alter Ego: Foundry's File Picker is unavailable.");
-    return;
+function getDialogContentRoot(dialog) {
+  return dialog?.element?.querySelector?.(".token-alter-ego-editor") ?? dialog?.element ?? null;
+}
+
+function wireConfigurationDialog(dialog) {
+  const content = getDialogContentRoot(dialog);
+  if (!content) return;
+
+  for (const key of ["a", "b"]) {
+    const card = content.querySelector(`[data-identity="${key}"]`);
+    if (!card) continue;
+
+    const imgInput = card.querySelector('[data-field="img"]');
+    const preview = card.querySelector(".tae-preview");
+    if (!imgInput || !preview) continue;
+
+    imgInput.addEventListener("input", () => {
+      preview.src = imgInput.value.trim() || "icons/svg/mystery-man.svg";
+    });
   }
 
-  const picker = new FilePickerClass({
-    type: "image",
-    current: input.value,
-    callback: (path) => {
-      input.value = path;
-      preview.src = path || "icons/svg/mystery-man.svg";
-      input.dispatchEvent(new Event("change", { bubbles: true }));
-    }
-  });
+  content.querySelectorAll('button[data-action="browse"]').forEach((button) => {
+    button.addEventListener("click", async (event) => {
+      event.preventDefault();
+      event.stopPropagation();
 
-  await picker.browse(input.value || "");
+      const card = button.closest(".tae-identity-card");
+      const input = card?.querySelector('[data-field="img"]');
+      const preview = card?.querySelector(".tae-preview");
+      if (!input || !preview) return;
+
+      try {
+        const FilePickerClass = foundry?.applications?.apps?.FilePicker ?? globalThis.FilePicker;
+        if (!FilePickerClass) throw new Error("Foundry FilePicker class was not found.");
+
+        const picker = new FilePickerClass({
+          type: "image",
+          current: input.value,
+          callback: (path) => {
+            input.value = path;
+            preview.src = path || "icons/svg/mystery-man.svg";
+            input.dispatchEvent(new Event("input", { bubbles: true }));
+          }
+        });
+
+        // V13 FilePicker is ApplicationV2. Browse first so the requested path is prepared,
+        // then render the picker as a normal Foundry application.
+        await picker.browse(input.value || "");
+        picker.render(true);
+      } catch (error) {
+        console.error(`${MODULE_ID} | Failed to open File Picker`, error);
+        ui.notifications.error("Token Alter Ego: Could not open Foundry's file picker. Check F12 for details.");
+      }
+    });
+  });
 }
 
 function readEditorValues(content) {
   const read = (key, field) => content
-    .querySelector(`[data-identity="${key}"] [data-field="${field}"]`)
+    ?.querySelector(`[data-identity="${key}"] [data-field="${field}"]`)
     ?.value
     ?.trim() ?? "";
 
@@ -194,74 +228,70 @@ async function openConfiguration(actor, tokenDocument) {
     return;
   }
 
-  const content = buildIdentityEditor(actor, tokenDocument);
+  try {
+    const DialogV2 = foundry?.applications?.api?.DialogV2;
+    if (!DialogV2) throw new Error("Foundry DialogV2 class was not found.");
 
-  content.addEventListener("click", async (event) => {
-    const button = event.target.closest('button[data-action="browse"]');
-    if (!button) return;
-    event.preventDefault();
+    const content = buildIdentityEditor(actor, tokenDocument);
 
-    const card = button.closest(".tae-identity-card");
-    const input = card.querySelector('[data-field="img"]');
-    const preview = card.querySelector(".tae-preview");
-    await browseForImage(input, preview);
-  });
+    const result = await DialogV2.wait({
+      window: { title: `Token Alter Ego — ${actor.name}` },
+      content,
+      // Keep the dialog non-modal so Foundry's FilePicker can open above it normally.
+      modal: false,
+      render: (_event, dialog) => wireConfigurationDialog(dialog),
+      buttons: [
+        {
+          action: "clear",
+          label: "Clear",
+          icon: "fa-solid fa-trash",
+          callback: async () => ({ action: "clear" })
+        },
+        {
+          action: "cancel",
+          label: "Cancel",
+          icon: "fa-solid fa-xmark",
+          callback: async () => ({ action: "cancel" })
+        },
+        {
+          action: "save",
+          label: "Save Identities",
+          icon: "fa-solid fa-floppy-disk",
+          default: true,
+          callback: async (_event, _button, dialog) => ({
+            action: "save",
+            identities: readEditorValues(getDialogContentRoot(dialog))
+          })
+        }
+      ]
+    });
 
-  const DialogV2 = foundry?.applications?.api?.DialogV2;
-  if (!DialogV2) {
-    ui.notifications.error("Token Alter Ego requires Foundry VTT v13 or newer.");
-    return;
-  }
+    if (!result || result.action === "cancel") return;
 
-  const result = await DialogV2.wait({
-    window: { title: `Token Alter Ego — ${actor.name}` },
-    content,
-    modal: true,
-    buttons: [
-      {
-        action: "clear",
-        label: "Clear",
-        icon: "fa-solid fa-trash",
-        callback: () => ({ action: "clear" })
-      },
-      {
-        action: "cancel",
-        label: "Cancel",
-        icon: "fa-solid fa-xmark",
-        callback: () => ({ action: "cancel" })
-      },
-      {
-        action: "save",
-        label: "Save Identities",
-        icon: "fa-solid fa-floppy-disk",
-        default: true,
-        callback: () => ({ action: "save", identities: readEditorValues(content) })
+    if (result.action === "clear") {
+      await actor.unsetFlag(MODULE_ID, FLAG_IDENTITIES);
+      if (tokenDocument?.getFlag(MODULE_ID, FLAG_CURRENT)) {
+        await tokenDocument.unsetFlag(MODULE_ID, FLAG_CURRENT);
       }
-    ]
-  });
-
-  if (!result || result.action === "cancel") return;
-
-  if (result.action === "clear") {
-    await actor.unsetFlag(MODULE_ID, FLAG_IDENTITIES);
-    if (tokenDocument?.getFlag(MODULE_ID, FLAG_CURRENT)) {
-      await tokenDocument.unsetFlag(MODULE_ID, FLAG_CURRENT);
+      ui.notifications.info(`Token Alter Ego: Cleared identities for ${actor.name}.`);
+      return;
     }
-    ui.notifications.info(`Token Alter Ego: Cleared identities for ${actor.name}.`);
-    return;
+
+    if (!isConfigured(result.identities)) {
+      ui.notifications.warn("Token Alter Ego: Both identities need a name and token image.");
+      return;
+    }
+
+    await actor.setFlag(MODULE_ID, FLAG_IDENTITIES, result.identities);
+
+    const detected = currentIdentityForToken(tokenDocument, result.identities);
+    if (tokenDocument) await tokenDocument.setFlag(MODULE_ID, FLAG_CURRENT, detected);
+
+    ui.notifications.info(`Token Alter Ego: Saved identities for ${actor.name}.`);
+  } catch (error) {
+    console.error(`${MODULE_ID} | Failed to open or save configuration`, error);
+    ui.notifications.error("Token Alter Ego: Configuration failed to open. Press F12 and check the Console for the Token Alter Ego error.");
   }
-
-  if (!isConfigured(result.identities)) {
-    ui.notifications.warn("Token Alter Ego: Both identities need a name and token image.");
-    return;
-  }
-
-  await actor.setFlag(MODULE_ID, FLAG_IDENTITIES, result.identities);
-
-  const detected = currentIdentityForToken(tokenDocument, result.identities);
-  if (tokenDocument) await tokenDocument.setFlag(MODULE_ID, FLAG_CURRENT, detected);
-
-  ui.notifications.info(`Token Alter Ego: Saved identities for ${actor.name}.`);
 }
 
 function makeHudControl({ icon, title, className, onClick }) {
@@ -276,7 +306,19 @@ function makeHudControl({ icon, title, className, onClick }) {
   const activate = (event) => {
     event.preventDefault();
     event.stopPropagation();
-    onClick(event);
+
+    try {
+      const result = onClick(event);
+      if (result?.catch) {
+        result.catch((error) => {
+          console.error(`${MODULE_ID} | HUD action failed`, error);
+          ui.notifications.error("Token Alter Ego: The HUD action failed. Press F12 and check the Console for details.");
+        });
+      }
+    } catch (error) {
+      console.error(`${MODULE_ID} | HUD action failed`, error);
+      ui.notifications.error("Token Alter Ego: The HUD action failed. Press F12 and check the Console for details.");
+    }
   };
 
   control.addEventListener("click", activate);
@@ -287,7 +329,7 @@ function makeHudControl({ icon, title, className, onClick }) {
 }
 
 Hooks.once("init", () => {
-  console.log(`${MODULE_ID} | Initializing Token Alter Ego v1.0.0`);
+  console.log(`${MODULE_ID} | Initializing Token Alter Ego v${MODULE_VERSION}`);
 });
 
 Hooks.on("renderTokenHUD", (hud, html) => {
