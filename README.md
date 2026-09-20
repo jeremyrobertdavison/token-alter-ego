@@ -6,15 +6,16 @@ The module changes only the placed token's **displayed name**, **token artwork**
 
 ## Features
 
-- Configure two identities on an Actor.
+- Configure two identities on an Actor; configuration is stored persistently on the world-level base Actor.
 - Give each identity its own displayed token name and token artwork.
 - Give each identity its own token width and height in grid spaces.
 - Toggle between identities from the Token HUD.
 - Current identity is tracked independently for each placed token.
 - Configuration controls are GM-only.
-- Players who own a token may use its identity toggle after the GM configures it.
+- Players who own the token or represented Actor may use its identity toggle after the GM configures it. The toggle request is GM-authoritative, so players do not need Foundry's separate Configure Token Settings permission.
 - Existing v1.0.x identity configurations default to 1 x 1 until another size is saved.
 - System agnostic.
+- Identity configuration is persistent across scene/game reloads for linked and unlinked tokens.
 - Designed for Foundry VTT v13.
 
 ## Example
@@ -44,3 +45,7 @@ Use the manifest URL:
 ## License
 
 MIT
+
+## Permissions
+
+Only a GM can configure or clear identities. After configuration, a player with **Owner** permission for the represented Actor/token can use the Token HUD identity toggle. A connected GM authorizes and performs the token-document change, which allows the toggle to work without granting players broad token-configuration permission.

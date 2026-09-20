@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.1.1
+- Fixed identity configuration persistence by storing shared identity data on the token's world-level base Actor rather than relying on a synthetic Token Actor.
+- Added a per-token identity configuration cache as a fallback for systems which rebuild synthetic Actors.
+- Improved compatibility with unlinked tokens and scene reloads.
+- Players with Owner permission on the token or represented Actor can use the identity toggle.
+- Identity configuration remains GM-only.
+- Player identity changes are routed through the active GM, so they continue to work even when Foundry's Configure Token Settings permission is disabled for the player's role.
+- Added validation so only owners can request a player-side identity change.
+
 ## 1.1.0
 - Added configurable token width and height for each identity.
 - Identity swaps now update displayed name, artwork, width, and height together.
