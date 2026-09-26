@@ -1,5 +1,5 @@
 const MODULE_ID = "token-alter-ego";
-const MODULE_VERSION = "1.1.1";
+const MODULE_VERSION = "1.2.0";
 const FLAG_IDENTITIES = "identities";
 const FLAG_CURRENT = "currentIdentity";
 const FLAG_IDENTITIES_CACHE = "identitiesCache";
@@ -140,6 +140,12 @@ async function performIdentityUpdate(tokenDocument, identities) {
       height: normalizeDimension(next.height),
       [`flags.${MODULE_ID}.${FLAG_CURRENT}`]: nextKey
     });
+
+    const persistentActor = getPersistentActor(tokenDocument?.actor ?? null, tokenDocument);
+    const nextAvatar = next.avatar?.trim?.() ?? "";
+    if (persistentActor && nextAvatar && persistentActor.img !== nextAvatar) {
+      await persistentActor.update({ img: nextAvatar });
+    }
   } catch (error) {
     console.error(`${MODULE_ID} | Failed to toggle identity`, error);
     ui.notifications.error("Token Alter Ego: Could not change this token. Check the browser console (F12) for details.");
@@ -186,12 +192,14 @@ function buildIdentityEditor(actor, tokenDocument) {
     a: {
       name: saved?.a?.name ?? tokenName,
       img: saved?.a?.img ?? tokenImg,
+      avatar: saved?.a?.avatar ?? actor?.img ?? tokenImg,
       width: normalizeDimension(saved?.a?.width),
       height: normalizeDimension(saved?.a?.height)
     },
     b: {
       name: saved?.b?.name ?? "",
       img: saved?.b?.img ?? "",
+      avatar: saved?.b?.avatar ?? "",
       width: normalizeDimension(saved?.b?.width),
       height: normalizeDimension(saved?.b?.height)
     }
@@ -201,12 +209,21 @@ function buildIdentityEditor(actor, tokenDocument) {
   wrapper.className = "token-alter-ego-editor";
   wrapper.innerHTML = `
     <p class="notes">
-      Configure the two identities used by this Actor. Toggling changes the placed token's displayed name, artwork, width, and height.
+      Configure the two identities used by this Actor. Toggling changes the placed token's displayed name, token artwork, width, and height, and can also change the Actor avatar image.
     </p>
     <div class="tae-identity-grid">
       <section class="tae-identity-card" data-identity="a">
         <h3><i class="fa-solid fa-user"></i> Identity A</h3>
-        <img class="tae-preview" alt="Identity A preview">
+        <div class="tae-preview-row">
+          <div>
+            <div class="tae-preview-label">Token</div>
+            <img class="tae-preview tae-token-preview" alt="Identity A token preview">
+          </div>
+          <div>
+            <div class="tae-preview-label">Avatar</div>
+            <img class="tae-preview tae-avatar-preview" alt="Identity A avatar preview">
+          </div>
+        </div>
         <div class="form-group">
           <label>Name shown on token</label>
           <input type="text" data-field="name" autocomplete="off">
@@ -215,7 +232,16 @@ function buildIdentityEditor(actor, tokenDocument) {
           <label>Token artwork</label>
           <div class="form-fields tae-image-field">
             <input type="text" data-field="img" autocomplete="off">
-            <button type="button" data-action="browse" title="Browse Files">
+            <button type="button" data-action="browse" data-target="img" title="Browse Files">
+              <i class="fa-solid fa-file-import"></i>
+            </button>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Actor avatar image</label>
+          <div class="form-fields tae-image-field">
+            <input type="text" data-field="avatar" autocomplete="off">
+            <button type="button" data-action="browse" data-target="avatar" title="Browse Files">
               <i class="fa-solid fa-file-import"></i>
             </button>
           </div>
@@ -233,7 +259,16 @@ function buildIdentityEditor(actor, tokenDocument) {
       </section>
       <section class="tae-identity-card" data-identity="b">
         <h3><i class="fa-solid fa-mask"></i> Identity B</h3>
-        <img class="tae-preview" alt="Identity B preview">
+        <div class="tae-preview-row">
+          <div>
+            <div class="tae-preview-label">Token</div>
+            <img class="tae-preview tae-token-preview" alt="Identity B token preview">
+          </div>
+          <div>
+            <div class="tae-preview-label">Avatar</div>
+            <img class="tae-preview tae-avatar-preview" alt="Identity B avatar preview">
+          </div>
+        </div>
         <div class="form-group">
           <label>Name shown on token</label>
           <input type="text" data-field="name" autocomplete="off">
@@ -242,7 +277,16 @@ function buildIdentityEditor(actor, tokenDocument) {
           <label>Token artwork</label>
           <div class="form-fields tae-image-field">
             <input type="text" data-field="img" autocomplete="off">
-            <button type="button" data-action="browse" title="Browse Files">
+            <button type="button" data-action="browse" data-target="img" title="Browse Files">
+              <i class="fa-solid fa-file-import"></i>
+            </button>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Actor avatar image</label>
+          <div class="form-fields tae-image-field">
+            <input type="text" data-field="avatar" autocomplete="off">
+            <button type="button" data-action="browse" data-target="avatar" title="Browse Files">
               <i class="fa-solid fa-file-import"></i>
             </button>
           </div>
@@ -268,17 +312,21 @@ function buildIdentityEditor(actor, tokenDocument) {
     const card = wrapper.querySelector(`[data-identity="${key}"]`);
     const nameInput = card.querySelector('[data-field="name"]');
     const imgInput = card.querySelector('[data-field="img"]');
+    const avatarInput = card.querySelector('[data-field="avatar"]');
     const widthInput = card.querySelector('[data-field="width"]');
     const heightInput = card.querySelector('[data-field="height"]');
-    const preview = card.querySelector(".tae-preview");
+    const tokenPreview = card.querySelector(".tae-token-preview");
+    const avatarPreview = card.querySelector(".tae-avatar-preview");
 
     // DialogV2 v13 expects string content (or a bare attribute-free element).
     // We build with the DOM for safe value assignment, then serialize to HTML.
     nameInput.setAttribute("value", values[key].name);
     imgInput.setAttribute("value", values[key].img);
+    avatarInput.setAttribute("value", values[key].avatar);
     widthInput.setAttribute("value", String(values[key].width));
     heightInput.setAttribute("value", String(values[key].height));
-    preview.setAttribute("src", values[key].img || "icons/svg/mystery-man.svg");
+    tokenPreview.setAttribute("src", values[key].img || "icons/svg/mystery-man.svg");
+    avatarPreview.setAttribute("src", values[key].avatar || "icons/svg/mystery-man.svg");
   }
 
   return wrapper.outerHTML;
@@ -297,12 +345,21 @@ function wireConfigurationDialog(dialog) {
     if (!card) continue;
 
     const imgInput = card.querySelector('[data-field="img"]');
-    const preview = card.querySelector(".tae-preview");
-    if (!imgInput || !preview) continue;
+    const avatarInput = card.querySelector('[data-field="avatar"]');
+    const tokenPreview = card.querySelector(".tae-token-preview");
+    const avatarPreview = card.querySelector(".tae-avatar-preview");
 
-    imgInput.addEventListener("input", () => {
-      preview.src = imgInput.value.trim() || "icons/svg/mystery-man.svg";
-    });
+    if (imgInput && tokenPreview) {
+      imgInput.addEventListener("input", () => {
+        tokenPreview.src = imgInput.value.trim() || "icons/svg/mystery-man.svg";
+      });
+    }
+
+    if (avatarInput && avatarPreview) {
+      avatarInput.addEventListener("input", () => {
+        avatarPreview.src = avatarInput.value.trim() || "icons/svg/mystery-man.svg";
+      });
+    }
   }
 
   content.querySelectorAll('button[data-action="browse"]').forEach((button) => {
@@ -311,8 +368,11 @@ function wireConfigurationDialog(dialog) {
       event.stopPropagation();
 
       const card = button.closest(".tae-identity-card");
-      const input = card?.querySelector('[data-field="img"]');
-      const preview = card?.querySelector(".tae-preview");
+      const field = button.dataset.target || "img";
+      const input = card?.querySelector(`[data-field="${field}"]`);
+      const preview = field === "avatar"
+        ? card?.querySelector(".tae-avatar-preview")
+        : card?.querySelector(".tae-token-preview");
       if (!input || !preview) return;
 
       try {
@@ -351,12 +411,14 @@ function readEditorValues(content) {
     a: {
       name: read("a", "name"),
       img: read("a", "img"),
+      avatar: read("a", "avatar"),
       width: normalizeDimension(read("a", "width")),
       height: normalizeDimension(read("a", "height"))
     },
     b: {
       name: read("b", "name"),
       img: read("b", "img"),
+      avatar: read("b", "avatar"),
       width: normalizeDimension(read("b", "width")),
       height: normalizeDimension(read("b", "height"))
     }
@@ -431,7 +493,7 @@ async function openConfiguration(actor, tokenDocument) {
     }
 
     if (!isConfigured(result.identities)) {
-      ui.notifications.warn("Token Alter Ego: Both identities need a name and token image.");
+      ui.notifications.warn("Token Alter Ego: Both identities need a name and token image. Avatar images are optional.");
       return;
     }
 

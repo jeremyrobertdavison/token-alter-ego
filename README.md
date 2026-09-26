@@ -49,3 +49,10 @@ MIT
 ## Permissions
 
 Only a GM can configure or clear identities. After configuration, a player with **Owner** permission for the represented Actor/token can use the Token HUD identity toggle. A connected GM authorizes and performs the token-document change, which allows the toggle to work without granting players broad token-configuration permission.
+
+
+## New in v1.2.0
+
+Each identity can optionally define an **Actor avatar image**. When the identity is toggled, the module can update the Actor's portrait/avatar image everywhere that Actor is shown in Foundry.
+
+> Note: because the avatar is an Actor-level property, if you have multiple placed tokens for the same Actor, they will share the same current avatar image.

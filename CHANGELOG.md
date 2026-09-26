@@ -1,37 +1,12 @@
 # Changelog
 
+## 1.2.0
+- Added optional per-identity Actor avatar image fields.
+- Swapping identities can now change the Actor avatar/portrait image in addition to token name, token artwork, and token size.
+- Added separate token and avatar previews in the configuration dialog.
+- Players with ownership can still toggle identities; the active GM applies token and avatar changes.
+
 ## 1.1.1
-- Fixed identity configuration persistence by storing shared identity data on the token's world-level base Actor rather than relying on a synthetic Token Actor.
-- Added a per-token identity configuration cache as a fallback for systems which rebuild synthetic Actors.
-- Improved compatibility with unlinked tokens and scene reloads.
-- Players with Owner permission on the token or represented Actor can use the identity toggle.
-- Identity configuration remains GM-only.
-- Player identity changes are routed through the active GM, so they continue to work even when Foundry's Configure Token Settings permission is disabled for the player's role.
-- Added validation so only owners can request a player-side identity change.
-
-## 1.1.0
-- Added configurable token width and height for each identity.
-- Identity swaps now update displayed name, artwork, width, and height together.
-- Existing v1.0.x configurations safely default missing dimensions to 1 x 1.
-- Supports fractional positive grid sizes through the configuration fields.
-- Token position is preserved when size changes; resizing expands or shrinks from the current top-left position.
-
-## 1.0.2
-- Fixed the Foundry V13 DialogV2 `config.content element must have no attributes` error.
-- Configuration content is now supplied to DialogV2 as an HTML string, matching the documented v13 usage.
-- Preserved identity names and image paths safely when serializing the configuration form.
-
-## 1.0.1
-- Fixed the Configure Alter Ego HUD action so the Foundry V13 DialogV2 configuration window opens reliably.
-- Moved dialog event wiring to DialogV2's render callback, matching Foundry V13 behavior.
-- Improved FilePicker handling.
-- Added visible error notifications and console diagnostics instead of silent failures.
-
-## 1.0.0
-- Initial release.
-- Two identities per Actor.
-- Each identity stores a token display name and token image.
-- One-click identity switching from the Token HUD.
-- GM-only identity configuration.
-- Player toggle support for owned tokens.
-- Per-token current identity state.
+- Fixed identity persistence across reloads by storing configuration on the base Actor.
+- Added per-token configuration fallback caching.
+- Players with Owner permission can change identities while configuration remains GM-only.
